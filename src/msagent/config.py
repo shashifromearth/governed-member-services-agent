@@ -82,7 +82,7 @@ class Settings:
         def _opt_f(name: str) -> float | None:
             return float(env[name]) if env.get(name) else None
 
-        api_base = env.get("MSA_API_BASE_URL", "http://localhost:8090").rstrip("/")
+        api_base = env.get("MSA_API_BASE_URL", "http://127.0.0.1:8090").rstrip("/")
         provider = env.get("MSA_LLM_PROVIDER", "anthropic").lower()
         base_url = env.get("MSA_LLM_BASE_URL") or None
         if provider == "ollama":  # convenience alias for the OpenAI-compatible endpoint
