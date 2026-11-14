@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 5 * * *"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests
+      # Synthetic KB + fake upstream: needs neither the pack nor a model.
+      - run: pytest
+
+  eval-gate:
+    # Regression gate against the real pack and the production model.
+    # The pack is not in this repository; it is fetched from a private location.
+    if: github.ref == 'refs/heads/main' && vars.EVAL_ENABLED == 'true'
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      MSA_PACK_DIR: ${{ github.workspace }}/pack
+      MSA_API_BASE_URL: http://127.0.0.1:8090
+      MSA_TOKEN_PLAN_A: ${{ secrets.MSA_TOKEN_PLAN_A }}
+      MSA_TOKEN_PLAN_B: ${{ secrets.MSA_TOKEN_PLAN_B }}
+      MSA_DIRECTORY_API_KEY: ${{ secrets.MSA_DIRECTORY_API_KEY }}
+      MSA_LLM_PROVIDER: anthropic
+      MSA_LLM_MODEL: claude-haiku-5-5
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      MSA_LOG_HMAC_KEY: ${{ secrets.MSA_LOG_HMAC_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.PACK_REPOSITORY }}
+          token: ${{ secrets.PACK_REPOSITORY_TOKEN }}
+          path: pack
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Start mock services
+        run: |
+          python pack/mock_services/server.py --port 8090 &
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8090/health && break; sleep 0.5; done
+      - run: msagent doctor
+      - name: Evaluate (exit code is the gate)
+        run: msagent eval
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-report
+          path: |
+            reports/eval_report.md
+            reports/eval_summary.json
