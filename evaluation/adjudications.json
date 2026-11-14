@@ -15,6 +15,12 @@
       ],
       "reason": "Expected amount equals the 2027 plan-year deductible minus the amount met in 2026. As of 2026-11-15 the member's accumulators are for plan year 2026, so the remaining deductible must use the 2026 plan amount."
     },
+    "EV-34": {
+      "facts": [
+        "DENIED"
+      ],
+      "reason": "Expected status is PAID, but the claims API returns this claim as DENIED (with a CARC denial code and zero plan payment). The answer must report the status the system of record holds."
+    },
     "EV-37": {
       "facts": [
         "$15 copay"

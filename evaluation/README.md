@@ -30,7 +30,7 @@ Per case, two independent judgements ([`scoring.py`](../src/msagent/evals/scorin
 
 ## Adjudicated cases
 
-Three supplied expectations conflict with the supplied data ([`adjudications.json`](adjudications.json)).
+Four supplied expectations conflict with the supplied data ([`adjudications.json`](adjudications.json)).
 The gate scores the corrected expectation; the report always shows the as-supplied score next to it, so
 nothing is hidden. Values that depend on member data are derived at run time rather than stored.
 
@@ -38,6 +38,7 @@ nothing is hidden. Values that depend on member data are derived at run time rat
 |---|---|---|---|
 | EV-23 | Benefit from a Prairie Sky (plan_b) document | The document sits in the plan_a KB folder but declares `tenant: plan_b`. Using it for a Harborview member is a cross-tenant leak. | The member's own Gold PPO 2026 benefit. |
 | EV-25 | Remaining deductible computed from the 2027 plan amount | On 2026-11-15 the accumulators are for plan year 2026. | 2026 plan deductible minus amount met. |
+| EV-34 | Claim status PAID | The claims API returns the claim as DENIED with a denial code and no plan payment. | The status held by the system of record. |
 | EV-37 | Value HDHP pharmacy benefit | The member is enrolled in Choice PPO. | The Choice PPO benefit. |
 
 If our reading of any of these is wrong, deleting its entry from `adjudications.json` restores the supplied

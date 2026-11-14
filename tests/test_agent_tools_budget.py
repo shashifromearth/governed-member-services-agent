@@ -154,3 +154,23 @@ def test_system_prompt_is_tenant_specific_and_stable(make_service):
     sys_a1, sys_a2, sys_b = (c[0] for c in svc.model.calls)
     assert sys_a1 == sys_a2                               # cacheable prefix: no member data in it
     assert "Alpha Health" in sys_a1 and "Beta Care" not in sys_a1 and "Alpha Health" not in sys_b
+
+
+def test_tools_state_the_yes_no_answer_so_the_model_does_not_derive_it(make_service):
+    svc = make_service([call("get_claim", claim_id="C1000000001"), call("get_claim", claim_id="C1000000004"),
+                        call("get_grievances"), say("ok")])
+    session = svc.start("plan_a", "M100001")
+    svc.send(session, "Can the member still appeal?")
+    recent, old, grievances = (json.loads(r["content"]) for r in tool_results(session))
+    assert recent["appeal"]["answer"].startswith("Yes") and "2026-11-28" in recent["appeal"]["answer"]
+    assert old["appeal"]["answer"].startswith("No")
+    assert grievances["grievances"][0]["resolution"]["answer"].startswith("Yes")
+
+
+def test_an_empty_model_reply_is_retried_once(make_service):
+    svc = make_service([say(""), say("The copay is $40.")])
+    session = svc.start("plan_a", "M100001")
+    assert svc.send(session, "Specialist copay?").text == "The copay is $40."
+    svc = make_service([say(""), say("")])
+    reply = svc.send(svc.start("plan_a", "M100001"), "Specialist copay?")
+    assert "couldn't produce an answer" in reply.text and len(svc.model.calls) == 2

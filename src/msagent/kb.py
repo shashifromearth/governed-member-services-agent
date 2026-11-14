@@ -312,6 +312,15 @@ class TenantKB:
                 )
         return None
 
+    def denial_guidance(self, carc: str) -> str | None:
+        """The plan's own 'what to tell the member' text for a denial code, if it publishes one."""
+        for doc in self.documents:
+            for row in self._rows.get(doc.source, []):
+                if row.get("CARC", "").strip().upper() == carc.strip().upper():
+                    text, flagged = sanitize(row.get("What to tell the member", ""))
+                    return None if flagged or not text else text
+        return None
+
     def policy(self) -> TenantPolicy:
         appeal = grievance = source = None
         for doc in self.documents:

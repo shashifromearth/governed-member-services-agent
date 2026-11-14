@@ -24,11 +24,14 @@ def _view(rt: ToolRuntime, g: dict[str, Any]) -> dict[str, Any]:
     if days and g.get("received_date"):
         deadline = add_days(g["received_date"], days)
         resolved = g.get("status") == "RESOLVED"
+        past = (not resolved) and rt.as_of > deadline
         out["resolution"] = {
+            "answer": (f"Yes - it is past the plan's resolution deadline, which was {deadline}." if past
+                       else f"No - it is not past the plan's resolution deadline ({deadline})."),
             "rule": f"{days} calendar days from the date received, per {rt.kb.policy().source}",
             "resolution_deadline": deadline,
             "today": rt.as_of,
-            "past_resolution_deadline": (not resolved) and rt.as_of > deadline,
+            "past_resolution_deadline": past,
         }
     return out
 

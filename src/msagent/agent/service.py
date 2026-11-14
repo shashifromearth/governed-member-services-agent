@@ -197,6 +197,7 @@ class AgentService:
         system = prompts.SYSTEM_TEMPLATE.format(tenant_name=session.ctx.tenant.name, as_of=session.as_of)
         specs = self.gateway.specs_for(session)
         llm = self.settings.llm
+        nudged = False
         while True:
             over = session.budget.check("model")
             if over:
@@ -221,6 +222,16 @@ class AgentService:
                         cached_input_tokens=resp.usage.cached_input_tokens, cost_usd=round(cost, 6),
                         stop_reason=resp.stop_reason, tool_calls=[c.name for c in resp.tool_calls],
                         text=resp.text[:1500])
+            if not resp.tool_calls and not resp.text and not nudged:
+                # An empty reply (seen with small open-weights models): ask once more, then give up.
+                nudged = True
+                tracer.emit("guardrail", "empty_model_reply", "info")
+                session.transcript.append({"role": "assistant", "text": "(no answer produced)",
+                                           "tool_calls": []})
+                session.transcript.append({"role": "user", "content": "<platform_note>Your last reply was "
+                                           "empty. Answer the representative's question now, using a tool "
+                                           "if you need one.</platform_note>"})
+                continue
             session.transcript.append(resp.as_message())
             if not resp.tool_calls:
                 return (resp.text or "I couldn't produce an answer to that. Nothing was changed."), "answered"
