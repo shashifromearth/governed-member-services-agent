@@ -122,7 +122,7 @@ class ToolRuntime:
             except NotFound:
                 data.not_in_tenant = True
                 raise MemberNotInTenant(self.ctx.member_id) from None
-            self.session.tracer.add_known_phi(member_identifiers(data.member))
+            self.session.tracer.add_known_phi(member_identifiers(data.member, for_logs=True))
         return data.member
 
     def benefits(self) -> dict[str, Any]:
@@ -154,15 +154,22 @@ class ToolRuntime:
         return data.claims
 
 
-def member_identifiers(member: dict[str, Any]) -> list[str]:
-    """Direct identifiers of the member, for exact-value scrubbing and egress checks."""
+def member_identifiers(member: dict[str, Any], for_logs: bool = False) -> list[str]:
+    """Direct identifiers of the member, for exact-value scrubbing and egress checks.
+
+    ``for_logs`` adds the bare first and last name. Over-redaction is acceptable in a log line;
+    it is not acceptable in a tool result, where a provider may share the member's surname.
+    """
     addr = member.get("address") or {}
     first, last = member.get("first_name", ""), member.get("last_name", "")
-    values = [f"{first} {last}".strip(), last, member.get("ssn", ""), member.get("dob", ""),
+    # Full name only: a bare surname would also scrub unrelated providers who share it.
+    values = [f"{first} {last}".strip(), member.get("ssn", ""), member.get("dob", ""),
               member.get("phone", ""), member.get("email", ""), addr.get("line1", "")]
     ssn = member.get("ssn", "")
     if ssn:
         values.append(ssn.replace("-", ""))
+    if for_logs:
+        values.extend([first, last])
     return [v for v in values if v]
 
 

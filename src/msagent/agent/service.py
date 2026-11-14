@@ -114,12 +114,13 @@ class AgentService:
         if masked:
             tracer.emit("guardrail", "input_ssn_masked", "denied", count=masked)
         session.rep_text = clean
-        tracer.emit("turn", "rep_message", "info", text=clean)
 
         # 1. Resolve the member inside the rep's tenant - before any model call.
         try:
             coverage = self.gateway.invoke(session, "get_coverage", {}, initiator="system")
         except MemberNotInTenant:
+            # No member record, so nothing to scrub by value: log the size of the message only.
+            tracer.emit("turn", "rep_message", "info", chars=len(clean))
             if session.turn == 1:
                 self.audit.record(tenant_id=ctx.tenant_id, rep_id=ctx.rep_id, member_id=ctx.member_id,
                                   conversation_id=ctx.conversation_id, action="member.lookup",
@@ -127,7 +128,11 @@ class AgentService:
             return self._reply(session, prompts.MEMBER_NOT_FOUND.format(tenant_name=ctx.tenant.name),
                                "member_not_found", record=False)
         except UpstreamError:
+            tracer.emit("turn", "rep_message", "info", chars=len(clean))
             return self._reply(session, prompts.MODEL_UNAVAILABLE, "unavailable", record=False)
+        # Traced only now: the member's identifiers are known, so anything the rep typed about
+        # the member (name, phone, ...) is scrubbed by value before it is written.
+        tracer.emit("turn", "rep_message", "info", text=clean)
         if not coverage.ok:
             limit = coverage.content.get("message", "limit reached")
             return self._reply(session, prompts.BUDGET_EXHAUSTED.format(limit=limit), "budget_exhausted",

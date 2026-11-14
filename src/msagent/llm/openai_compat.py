@@ -6,6 +6,7 @@ similar gateways, so an open-weights model can be used with no code change.
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from typing import Any
 
@@ -13,6 +14,29 @@ import httpx
 
 from ..config import LLMSettings
 from .base import Message, ModelError, ModelResponse, ToolCall, ToolSpec, Usage
+
+_TOOL_TAG = re.compile(r"^\s*(?:<tool_call>|```(?:json)?)?\s*(\{.*\})\s*(?:</tool_call>|```)?\s*$", re.S)
+
+
+def _inline_tool_call(text: str, known: set[str]) -> ToolCall | None:
+    """Some open-weights models print a tool call as JSON text instead of using the tool-call
+    channel. If the whole reply is exactly such an object naming a known tool, treat it as one."""
+    match = _TOOL_TAG.match(text or "")
+    if not match:
+        return None
+    try:
+        obj = json.loads(match.group(1))
+    except ValueError:
+        return None
+    if not isinstance(obj, dict) or obj.get("name") not in known:
+        return None
+    args = obj.get("arguments", obj.get("parameters", {}))
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except ValueError:
+            return None
+    return ToolCall(id=f"call_{uuid.uuid4().hex[:12]}", name=obj["name"], arguments=args or {})
 
 
 class OpenAICompatProvider:
@@ -81,9 +105,14 @@ class OpenAICompatProvider:
                 parsed = {"_unparseable_arguments": str(args)[:200]}
             calls.append(ToolCall(id=raw.get("id") or f"call_{uuid.uuid4().hex[:12]}",
                                   name=fn.get("name", ""), arguments=parsed))
+        text = (message.get("content") or "").strip()
+        if not calls and tools:
+            inline = _inline_tool_call(text, {t.name for t in tools})
+            if inline is not None:
+                calls, text = [inline], ""
         usage = data.get("usage") or {}
         return ModelResponse(
-            text=(message.get("content") or "").strip(),
+            text=text,
             tool_calls=calls,
             usage=Usage(input_tokens=usage.get("prompt_tokens", 0),
                         output_tokens=usage.get("completion_tokens", 0)),

@@ -1,0 +1,25 @@
+{
+  "_doc": "Cases whose supplied expectation conflicts with the supplied data. The gate scores these corrected expectations; the report also shows the as-supplied score. Values that depend on member data are derived at run time, not stored here.",
+  "cases": {
+    "EV-23": {
+      "facts": [
+        "$25 copay"
+      ],
+      "reason": "Expected facts come from a Prairie Sky Health (plan_b) document that sits in the plan_a KB folder. Its front-matter says tenant plan_b, so it is quarantined at ingestion; answering a plan_a member from it would be a cross-tenant leak (NFR-4). The member's own plan document (Gold PPO 2026) gives the behavioral-health outpatient cost, in person or virtual."
+    },
+    "EV-25": {
+      "facts": [
+        {
+          "derive": "deductible_remaining_current_plan_year"
+        }
+      ],
+      "reason": "Expected amount equals the 2027 plan-year deductible minus the amount met in 2026. As of 2026-11-15 the member's accumulators are for plan year 2026, so the remaining deductible must use the 2026 plan amount."
+    },
+    "EV-37": {
+      "facts": [
+        "$15 copay"
+      ],
+      "reason": "Expected fact is the Value HDHP benefit, but the member is enrolled in Choice PPO according to the member API. The answer must come from the member's own product."
+    }
+  }
+}
