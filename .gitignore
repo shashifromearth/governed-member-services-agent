@@ -1,0 +1,25 @@
+# --- Supplied assignment pack: never committed (treated as real member data) ---
+/BRIEF.md
+/data/
+/eval/
+/kb/
+/mock_services/
+/tools/
+/pack/
+
+# --- Secrets and local runtime state ---
+.env
+.env.*
+!.env.example
+/var/
+/reports/local/
+
+# --- Python ---
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/

@@ -1,0 +1,19 @@
+{
+  "_comment": "Non-secret tenant registry. Credentials are referenced by env var name and resolved from the secret store at runtime.",
+  "tenants": {
+    "plan_a": {
+      "name": "Harborview Health Plan",
+      "token_env": "MSA_TOKEN_PLAN_A",
+      "kb_dir": "kb/plan_a",
+      "products": {"GPPO": "HVH-PPO", "SHMO": "HVH-HMO"},
+      "directory_enabled": true
+    },
+    "plan_b": {
+      "name": "Prairie Sky Health",
+      "token_env": "MSA_TOKEN_PLAN_B",
+      "kb_dir": "kb/plan_b",
+      "products": {"CPPO": "PSH-CHOICE", "VHDHP": "PSH-VALUE"},
+      "directory_enabled": true
+    }
+  }
+}
