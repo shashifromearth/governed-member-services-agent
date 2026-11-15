@@ -1,0 +1,78 @@
+# Whole stack on one machine, no cloud account needed:
+#
+#   mock    the supplied mock APIs, run straight from your copy of the pack (never copied into an image)
+#   ollama  local open-weights model server  +  ollama-pull, which downloads the model once
+#   agent   the member-services agent (HTTP API on :8000)
+#
+#   docker compose up --build                 # start everything
+#   docker compose run --rm agent msagent eval    # evaluation + regression gate
+#
+# The agent is local-first: it uses the Ollama model unless ANTHROPIC_API_KEY or OPENAI_API_KEY is
+# set in .env, in which case that hosted provider is used instead (see README, "Model selection").
+#
+# PACK_DIR      host folder holding kb/, eval/, tools/, mock_services/   (default: this folder)
+# MSA_OLLAMA_URL  point at an Ollama you already run, e.g. http://host.docker.internal:11434/v1,
+#                 then start only what you need:  docker compose up --build mock agent
+
+services:
+  mock:
+    image: python:3.12-slim
+    command: ["python", "/pack/mock_services/server.py", "--host", "0.0.0.0", "--port", "8090"]
+    volumes:
+      - ${PACK_DIR:-.}:/pack:ro
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "${MSA_LOCAL_MODEL:-qwen2.5:7b}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  agent:
+    build: .
+    env_file:
+      - .env                     # upstream tokens, rep keys, optional hosted-model key
+    environment:
+      MSA_PACK_DIR: /pack
+      MSA_API_BASE_URL: http://mock:8090
+      MSA_DIRECTORY_BASE_URL: http://mock:8090/directory/v3
+      MSA_OLLAMA_URL: ${MSA_OLLAMA_URL:-http://ollama:11434/v1}
+      MSA_LOCAL_MODEL: ${MSA_LOCAL_MODEL:-qwen2.5:7b}
+    volumes:
+      - ${PACK_DIR:-.}:/pack:ro
+      - ./reports:/app/reports   # evaluation report lands in the working tree
+      - agent-var:/app/var       # traces and audit log
+    ports:
+      - "8000:8000"
+    depends_on:
+      mock:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+        required: false          # not needed when a hosted key or an external Ollama is used
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  ollama-models:
+  agent-var:

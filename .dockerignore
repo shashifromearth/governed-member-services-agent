@@ -1,0 +1,16 @@
+# Keep the supplied pack, secrets and local state out of the build context and the image.
+.git
+.venv
+.env
+.env.*
+var
+reports
+data
+eval
+kb
+mock_services
+tools
+BRIEF.md
+tests
+**/__pycache__
+*.egg-info

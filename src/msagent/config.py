@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -30,6 +31,43 @@ def load_dotenv(path: Path) -> None:
         os.environ.setdefault(key.strip(), value)
 
 
+LOCAL_MODEL_DEFAULT = "qwen2.5:7b"
+OLLAMA_URL_DEFAULT = "http://localhost:11434/v1"
+HOSTED_MODEL_DEFAULTS = {"anthropic": "claude-haiku-5-5", "openai": "gpt-4o-mini"}
+
+
+def resolve_llm(env: Mapping[str, str]) -> tuple[str, str, str | None, str | None, bool]:
+    """Decide which model the agent uses. Returns (provider, model, base_url, api_key, is_local).
+
+    ``MSA_LLM_PROVIDER=auto`` (the default) is **local first**: the agent runs on an open-weights
+    model served by Ollama and needs no account or key. A hosted provider is used only when the
+    operator has supplied its API key - Anthropic if ``ANTHROPIC_API_KEY`` is set, otherwise
+    OpenAI if ``OPENAI_API_KEY`` is set. Setting the provider explicitly (anthropic | openai |
+    ollama) skips the detection.
+    """
+    choice = (env.get("MSA_LLM_PROVIDER") or "auto").lower()
+    explicit_model = env.get("MSA_LLM_MODEL") or None
+    base_url = env.get("MSA_LLM_BASE_URL") or None
+    generic_key = env.get("MSA_LLM_API_KEY") or None
+    if choice == "auto":
+        if env.get("ANTHROPIC_API_KEY"):
+            choice = "anthropic"
+        elif env.get("OPENAI_API_KEY"):
+            choice = "openai"
+        else:
+            choice = "ollama"
+    if choice == "ollama":
+        return ("openai", explicit_model or env.get("MSA_LOCAL_MODEL") or LOCAL_MODEL_DEFAULT,
+                base_url or env.get("MSA_OLLAMA_URL") or OLLAMA_URL_DEFAULT, generic_key, True)
+    if choice == "anthropic":
+        return ("anthropic", explicit_model or HOSTED_MODEL_DEFAULTS["anthropic"], base_url,
+                generic_key or env.get("ANTHROPIC_API_KEY") or None, False)
+    if choice == "openai":
+        return ("openai", explicit_model or HOSTED_MODEL_DEFAULTS["openai"], base_url,
+                generic_key or env.get("OPENAI_API_KEY") or None, False)
+    raise ValueError(f"unknown MSA_LLM_PROVIDER '{choice}' (use auto | ollama | anthropic | openai)")
+
+
 @dataclass(frozen=True)
 class Budgets:
     """Per-conversation limits enforced by the gateway (see gateway/budget.py)."""
@@ -42,7 +80,7 @@ class Budgets:
 
 @dataclass(frozen=True)
 class LLMSettings:
-    provider: str = "anthropic"  # anthropic | openai (OpenAI-compatible: OpenAI, Azure, Ollama, vLLM)
+    provider: str = "anthropic"  # anthropic | openai (OpenAI-compatible: Ollama, OpenAI, Azure, vLLM)
     model: str = "claude-haiku-5-5"
     base_url: str | None = None
     api_key: str | None = None
@@ -83,15 +121,7 @@ class Settings:
             return float(env[name]) if env.get(name) else None
 
         api_base = env.get("MSA_API_BASE_URL", "http://127.0.0.1:8090").rstrip("/")
-        provider = env.get("MSA_LLM_PROVIDER", "anthropic").lower()
-        base_url = env.get("MSA_LLM_BASE_URL") or None
-        if provider == "ollama":  # convenience alias for the OpenAI-compatible endpoint
-            provider = "openai"
-            base_url = base_url or "http://localhost:11434/v1"
-        default_model = "claude-haiku-5-5" if provider == "anthropic" else "gpt-4o-mini"
-        api_key = env.get("MSA_LLM_API_KEY") or (
-            env.get("ANTHROPIC_API_KEY") if provider == "anthropic" else env.get("OPENAI_API_KEY")
-        )
+        provider, model, base_url, api_key, local = resolve_llm(env)
         return cls(
             pack_dir=Path(env.get("MSA_PACK_DIR") or str(REPO_ROOT)).resolve(),
             api_base_url=api_base,
@@ -103,15 +133,16 @@ class Settings:
                 max_steps=int(env.get("MSA_BUDGET_MAX_STEPS") or 40),
                 max_model_calls_per_turn=int(env.get("MSA_BUDGET_MAX_MODEL_CALLS_PER_TURN") or 6),
                 max_cost_usd=_f("MSA_BUDGET_MAX_COST_USD", 0.10),
-                turn_deadline_s=_f("MSA_BUDGET_TURN_DEADLINE_S", 30.0),
+                # A CPU-hosted local model needs minutes, not seconds, per call.
+                turn_deadline_s=_f("MSA_BUDGET_TURN_DEADLINE_S", 3600.0 if local else 30.0),
             ),
             llm=LLMSettings(
                 provider=provider,
-                model=env.get("MSA_LLM_MODEL") or default_model,
+                model=model,
                 base_url=base_url,
-                api_key=api_key or None,
+                api_key=api_key,
                 max_output_tokens=int(env.get("MSA_LLM_MAX_OUTPUT_TOKENS") or 1024),
-                timeout_s=_f("MSA_LLM_TIMEOUT_S", 120.0),
+                timeout_s=_f("MSA_LLM_TIMEOUT_S", 1200.0 if local else 120.0),
                 price_in_per_mtok=_opt_f("MSA_LLM_PRICE_IN_PER_MTOK"),
                 price_out_per_mtok=_opt_f("MSA_LLM_PRICE_OUT_PER_MTOK"),
             ),

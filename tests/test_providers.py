@@ -104,3 +104,43 @@ def test_provider_selection_is_configuration(monkeypatch, tmp_path):
     assert isinstance(build_provider(settings.llm), AnthropicProvider)
     with pytest.raises(ValueError):
         build_provider(LLMSettings(provider="nope"))
+
+
+@pytest.mark.parametrize("env,expected", [
+    # no key anywhere: local model, no account needed
+    ({}, ("openai", "qwen2.5:7b", "http://localhost:11434/v1", None, True)),
+    ({"MSA_LOCAL_MODEL": "llama3.1:8b", "MSA_OLLAMA_URL": "http://ollama:11434/v1"},
+     ("openai", "llama3.1:8b", "http://ollama:11434/v1", None, True)),
+    # a hosted provider is used only when its key was supplied
+    ({"ANTHROPIC_API_KEY": "k-a"}, ("anthropic", "claude-haiku-5-5", None, "k-a", False)),
+    ({"OPENAI_API_KEY": "k-o"}, ("openai", "gpt-4o-mini", None, "k-o", False)),
+    ({"ANTHROPIC_API_KEY": "k-a", "OPENAI_API_KEY": "k-o"}, ("anthropic", "claude-haiku-5-5", None, "k-a", False)),
+    # an empty key is not a key
+    ({"ANTHROPIC_API_KEY": "", "OPENAI_API_KEY": ""}, ("openai", "qwen2.5:7b", "http://localhost:11434/v1", None, True)),
+    # explicit choice wins over detection
+    ({"MSA_LLM_PROVIDER": "ollama", "ANTHROPIC_API_KEY": "k-a"},
+     ("openai", "qwen2.5:7b", "http://localhost:11434/v1", None, True)),
+    ({"MSA_LLM_PROVIDER": "auto", "MSA_LLM_MODEL": "custom"}, ("openai", "custom", "http://localhost:11434/v1", None, True)),
+])
+def test_local_model_is_the_default_and_hosted_needs_a_key(env, expected):
+    from msagent.config import resolve_llm
+
+    assert resolve_llm(env) == expected
+
+
+def test_unknown_provider_is_rejected():
+    from msagent.config import resolve_llm
+
+    with pytest.raises(ValueError):
+        resolve_llm({"MSA_LLM_PROVIDER": "nope"})
+
+
+def test_local_profile_gets_generous_time_limits(monkeypatch, tmp_path):
+    for var in ("MSA_LLM_PROVIDER", "MSA_LLM_MODEL", "MSA_LLM_BASE_URL", "MSA_LLM_API_KEY", "ANTHROPIC_API_KEY",
+                "OPENAI_API_KEY", "MSA_LLM_TIMEOUT_S", "MSA_BUDGET_TURN_DEADLINE_S", "MSA_LOCAL_MODEL"):
+        monkeypatch.delenv(var, raising=False)
+    local = Settings.from_env(env_file=tmp_path / "none.env")
+    assert (local.llm.timeout_s, local.budgets.turn_deadline_s) == (1200.0, 3600.0)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    hosted = Settings.from_env(env_file=tmp_path / "none.env")
+    assert (hosted.llm.provider, hosted.llm.timeout_s, hosted.budgets.turn_deadline_s) == ("anthropic", 120.0, 30.0)

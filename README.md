@@ -41,7 +41,52 @@ tests/                   99 tests on a synthetic KB and a fake upstream (no pack
 config/tenants.json      non-secret tenant registry (credentials are referenced by env var name)
 ```
 
-## Setup
+## Model selection: local first
+
+The agent runs **entirely on your machine by default**, on an open-weights model served by
+[Ollama](https://ollama.com) — no account, no API key, no data leaving the machine. A hosted model is used
+**only if you supply its key**:
+
+| What is in `.env` | Model used |
+|---|---|
+| nothing (default) | local `qwen2.5:7b` via Ollama (`MSA_LOCAL_MODEL` to change it) |
+| `ANTHROPIC_API_KEY=...` | Anthropic `claude-haiku-5-5` |
+| `OPENAI_API_KEY=...` (and no Anthropic key) | OpenAI `gpt-4o-mini` |
+| `MSA_LLM_PROVIDER=ollama \| anthropic \| openai` | forces that provider; `MSA_LLM_MODEL` / `MSA_LLM_BASE_URL` override model and endpoint (any OpenAI-compatible server works) |
+
+`msagent doctor` prints which one is active and whether the local model is pulled. On the local profile
+the model timeout and per-turn deadline default to generous values, because CPU inference takes minutes.
+
+## Quick start with Docker (everything local)
+
+Needs Docker and your copy of the pack. Compose runs the mock APIs (straight from the pack, read-only),
+an Ollama server, a one-off job that pulls the model, and the agent API.
+
+```bash
+cp .env.example .env
+```
+
+Fill in the three upstream credentials in `.env` (values are in the pack's `data/README.md`), then:
+
+```bash
+docker compose up --build
+```
+
+The API is on `http://localhost:8000` (`/docs` for OpenAPI). If the pack is not in this folder, set
+`PACK_DIR=/path/to/pack` first. Run the evaluation inside the stack:
+
+```bash
+docker compose run --rm agent msagent eval
+```
+
+Already running Ollama on the host (saves a second 4.7 GB model download)? Point the agent at it and start
+only the two services you need:
+
+```bash
+MSA_OLLAMA_URL=http://host.docker.internal:11434/v1 docker compose up --build mock agent
+```
+
+## Setup without Docker
 
 Python 3.11+ (developed on 3.15).
 
@@ -54,6 +99,9 @@ python -m venv .venv
 ```bash
 cp .env.example .env
 ```
+```bash
+ollama pull qwen2.5:7b
+```
 
 Then edit `.env`:
 
@@ -63,17 +111,9 @@ Then edit `.env`:
 2. **Upstream credentials** – `MSA_TOKEN_PLAN_A`, `MSA_TOKEN_PLAN_B`, `MSA_DIRECTORY_API_KEY`; the values for
    the mock are in the pack's `data/README.md`. They are read from the environment only and are never
    committed.
-3. **Model** – any of:
-
-| Provider | Settings |
-|---|---|
-| Anthropic API | `MSA_LLM_PROVIDER=anthropic`, `MSA_LLM_MODEL=claude-haiku-5-5`, `ANTHROPIC_API_KEY=...` |
-| OpenAI, Azure OpenAI, vLLM, any OpenAI-compatible endpoint | `MSA_LLM_PROVIDER=openai`, `MSA_LLM_MODEL=...`, `MSA_LLM_BASE_URL=.../v1`, `MSA_LLM_API_KEY=...` |
-| Ollama (open weights, local) | `MSA_LLM_PROVIDER=ollama`, `MSA_LLM_MODEL=qwen2.5:3b` (base URL defaults to `http://localhost:11434/v1`) |
-
-   For models not in the built-in price table, set `MSA_LLM_PRICE_IN_PER_MTOK` / `MSA_LLM_PRICE_OUT_PER_MTOK`
-   so cost budgets and the cost gate are meaningful. On a CPU-only machine also raise `MSA_LLM_TIMEOUT_S` and
-   `MSA_BUDGET_TURN_DEADLINE_S`.
+3. **Model** – nothing to do for the local default. Add a hosted key only if you want a hosted model (table
+   above). For models not in the built-in price table, set `MSA_LLM_PRICE_IN_PER_MTOK` /
+   `MSA_LLM_PRICE_OUT_PER_MTOK` so cost budgets and the cost gate are meaningful.
 
 ## Run
 
@@ -162,8 +202,8 @@ git-ignored because they are derived from member data.
 - **Model the agent ran on during development and for the committed report:** `qwen2.5:3b` (open weights,
   3B parameters) through Ollama's OpenAI-compatible endpoint, on a CPU-only laptop. No hosted model
   credential was available on the development machine.
-- **Intended production model:** a small hosted model (default `claude-haiku-5-5`); the Anthropic adapter is
-  unit-tested for wire format but has **not** been run against the live API.
+- **Hosted fallback:** used only when a key is supplied (default `claude-haiku-5-5` / `gpt-4o-mini`). The
+  Anthropic adapter is unit-tested for wire format but has **not** been run against the live API.
 
 ### Reading the committed report honestly
 

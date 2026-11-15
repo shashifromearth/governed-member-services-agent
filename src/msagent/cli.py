@@ -60,7 +60,20 @@ def _doctor(_: argparse.Namespace) -> int:
     ok = True
     print(f"pack dir        {settings.pack_dir}")
     print(f"upstream clock  {upstream_clock(settings.api_base_url) or 'UNREACHABLE ' + settings.api_base_url}")
-    print(f"model           {settings.llm.provider} / {settings.llm.model}")
+    llm = settings.llm
+    if llm.provider == "anthropic" or (llm.provider == "openai" and llm.api_key):
+        print(f"model           HOSTED  {llm.provider} / {llm.model}  (an API key was supplied)")
+    else:
+        import httpx
+
+        try:
+            listed = httpx.get(f"{llm.base_url}/models", timeout=5).json().get("data", [])
+            present = any(m.get("id") == llm.model for m in listed)
+            state = "available" if present else f"NOT PULLED - run: ollama pull {llm.model}"
+        except (httpx.HTTPError, ValueError):
+            present, state = False, f"model server UNREACHABLE at {llm.base_url}"
+        ok = ok and present
+        print(f"model           LOCAL   {llm.model} at {llm.base_url}  ({state}; no API key in use)")
     for tid in registry.ids():
         try:
             registry.api_token(tid)
