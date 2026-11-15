@@ -31,7 +31,7 @@ def load_dotenv(path: Path) -> None:
         os.environ.setdefault(key.strip(), value)
 
 
-LOCAL_MODEL_DEFAULT = "qwen2.5:7b"
+LOCAL_MODEL_DEFAULT = "qwen2.5:3b"
 OLLAMA_URL_DEFAULT = "http://localhost:11434/v1"
 HOSTED_MODEL_DEFAULTS = {"anthropic": "claude-haiku-5-5", "openai": "gpt-4o-mini"}
 

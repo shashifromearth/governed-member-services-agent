@@ -49,7 +49,7 @@ The agent runs **entirely on your machine by default**, on an open-weights model
 
 | What is in `.env` | Model used |
 |---|---|
-| nothing (default) | local `qwen2.5:7b` via Ollama (`MSA_LOCAL_MODEL` to change it) |
+| nothing (default) | local `qwen2.5:3b` via Ollama (`MSA_LOCAL_MODEL` to change it) |
 | `ANTHROPIC_API_KEY=...` | Anthropic `claude-haiku-5-5` |
 | `OPENAI_API_KEY=...` (and no Anthropic key) | OpenAI `gpt-4o-mini` |
 | `MSA_LLM_PROVIDER=ollama \| anthropic \| openai` | forces that provider; `MSA_LLM_MODEL` / `MSA_LLM_BASE_URL` override model and endpoint (any OpenAI-compatible server works) |
@@ -79,7 +79,7 @@ The API is on `http://localhost:8000` (`/docs` for OpenAPI). If the pack is not 
 docker compose run --rm agent msagent eval
 ```
 
-Already running Ollama on the host (saves a second 4.7 GB model download)? Point the agent at it and start
+Already running Ollama on the host (saves a second model download)? Point the agent at it and start
 only the two services you need:
 
 ```bash
@@ -100,7 +100,7 @@ python -m venv .venv
 cp .env.example .env
 ```
 ```bash
-ollama pull qwen2.5:7b
+ollama pull qwen2.5:3b
 ```
 
 Then edit `.env`:

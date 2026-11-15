@@ -108,7 +108,7 @@ def test_provider_selection_is_configuration(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize("env,expected", [
     # no key anywhere: local model, no account needed
-    ({}, ("openai", "qwen2.5:7b", "http://localhost:11434/v1", None, True)),
+    ({}, ("openai", "qwen2.5:3b", "http://localhost:11434/v1", None, True)),
     ({"MSA_LOCAL_MODEL": "llama3.1:8b", "MSA_OLLAMA_URL": "http://ollama:11434/v1"},
      ("openai", "llama3.1:8b", "http://ollama:11434/v1", None, True)),
     # a hosted provider is used only when its key was supplied
@@ -116,10 +116,10 @@ def test_provider_selection_is_configuration(monkeypatch, tmp_path):
     ({"OPENAI_API_KEY": "k-o"}, ("openai", "gpt-4o-mini", None, "k-o", False)),
     ({"ANTHROPIC_API_KEY": "k-a", "OPENAI_API_KEY": "k-o"}, ("anthropic", "claude-haiku-5-5", None, "k-a", False)),
     # an empty key is not a key
-    ({"ANTHROPIC_API_KEY": "", "OPENAI_API_KEY": ""}, ("openai", "qwen2.5:7b", "http://localhost:11434/v1", None, True)),
+    ({"ANTHROPIC_API_KEY": "", "OPENAI_API_KEY": ""}, ("openai", "qwen2.5:3b", "http://localhost:11434/v1", None, True)),
     # explicit choice wins over detection
     ({"MSA_LLM_PROVIDER": "ollama", "ANTHROPIC_API_KEY": "k-a"},
-     ("openai", "qwen2.5:7b", "http://localhost:11434/v1", None, True)),
+     ("openai", "qwen2.5:3b", "http://localhost:11434/v1", None, True)),
     ({"MSA_LLM_PROVIDER": "auto", "MSA_LLM_MODEL": "custom"}, ("openai", "custom", "http://localhost:11434/v1", None, True)),
 ])
 def test_local_model_is_the_default_and_hosted_needs_a_key(env, expected):

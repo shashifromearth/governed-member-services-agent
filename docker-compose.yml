@@ -42,7 +42,7 @@ services:
     image: ollama/ollama:latest
     environment:
       OLLAMA_HOST: http://ollama:11434
-    entrypoint: ["ollama", "pull", "${MSA_LOCAL_MODEL:-qwen2.5:7b}"]
+    entrypoint: ["ollama", "pull", "${MSA_LOCAL_MODEL:-qwen2.5:3b}"]
     depends_on:
       ollama:
         condition: service_healthy
@@ -57,7 +57,7 @@ services:
       MSA_API_BASE_URL: http://mock:8090
       MSA_DIRECTORY_BASE_URL: http://mock:8090/directory/v3
       MSA_OLLAMA_URL: ${MSA_OLLAMA_URL:-http://ollama:11434/v1}
-      MSA_LOCAL_MODEL: ${MSA_LOCAL_MODEL:-qwen2.5:7b}
+      MSA_LOCAL_MODEL: ${MSA_LOCAL_MODEL:-qwen2.5:3b}
     volumes:
       - ${PACK_DIR:-.}:/pack:ro
       - ./reports:/app/reports   # evaluation report lands in the working tree
