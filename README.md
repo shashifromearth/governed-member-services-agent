@@ -126,10 +126,10 @@ python mock_services/server.py --port 8090
 msagent doctor
 ```
 
-**3a. Talk to the agent (CLI)** – a conversation is bound to one tenant and one member:
+**3a. Talk to the agent (CLI)** – a conversation is bound to one tenant and one member (use a member id from the pack):
 
 ```bash
-msagent chat --tenant plan_a --member M704649
+msagent chat --tenant plan_a --member <member_id>
 ```
 
 Type the rep's messages; `/confirm` and `/cancel` act on a drafted grievance (typing "yes, go ahead and file
@@ -145,7 +145,7 @@ Rep keys map to a tenant via `MSA_REP_KEYS` (see `.env.example`). The tenant alw
 from the request body.
 
 ```bash
-curl -s -X POST localhost:8000/v1/conversations -H "Authorization: Bearer dev-rep-a" -H "Content-Type: application/json" -d '{"member_id":"M704649"}'
+curl -s -X POST localhost:8000/v1/conversations -H "Authorization: Bearer dev-rep-a" -H "Content-Type: application/json" -d '{"member_id":"<member_id>"}'
 ```
 ```bash
 curl -s -X POST localhost:8000/v1/conversations/<id>/messages -H "Authorization: Bearer dev-rep-a" -H "Content-Type: application/json" -d '{"text":"Please file a billing grievance: the provider billed the member in full for the 2026-08-14 office visit."}'
