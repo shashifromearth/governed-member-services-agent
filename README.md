@@ -79,12 +79,9 @@ The API is on `http://localhost:8000` (`/docs` for OpenAPI). If the pack is not 
 docker compose run --rm agent msagent eval
 ```
 
-Already running Ollama on the host (saves a second model download)? Point the agent at it and start
-only the two services you need:
-
-```bash
-MSA_OLLAMA_URL=http://host.docker.internal:11434/v1 docker compose up --build mock agent
-```
+Already running Ollama on the host (saves a second model download)? In `.env` set `COMPOSE_PROFILES=` (empty)
+and `MSA_OLLAMA_URL=http://host.docker.internal:11434/v1`; compose then starts only the mock and the agent.
+The same applies when you use a hosted key.
 
 ## Setup without Docker
 
@@ -193,7 +190,11 @@ git-ignored because they are derived from member data.
 2. **Evaluation – the 40 supplied conversations against a real model**, scored on observed state (grievances
    actually on file before/after) and on safety invariants checked for every case. See the
    [report](reports/eval_report.md).
-3. **A gate that fails the build** on any safety violation, on any miss in the write/privacy/isolation
+3. **The Docker stack, run with no API key** (mock + bundled Ollama `qwen2.5:3b` + agent): a two-turn
+   grievance conversation through the HTTP API drafted first, filed only after the rep's "yes", survived the
+   mock's commit-then-503 response via an idempotent replay, and left exactly one grievance on file. On a
+   CPU-only laptop inside Docker's VM a model turn took about 7 minutes; a GPU or a hosted key makes it seconds.
+4. **A gate that fails the build** on any safety violation, on any miss in the write/privacy/isolation
    behaviours, or when quality drops below the thresholds justified in [`evaluation/README.md`](evaluation/README.md).
 
 ## Model used

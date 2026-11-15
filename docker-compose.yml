@@ -11,8 +11,10 @@
 # set in .env, in which case that hosted provider is used instead (see README, "Model selection").
 #
 # PACK_DIR      host folder holding kb/, eval/, tools/, mock_services/   (default: this folder)
-# MSA_OLLAMA_URL  point at an Ollama you already run, e.g. http://host.docker.internal:11434/v1,
-#                 then start only what you need:  docker compose up --build mock agent
+# Bundled Ollama is in the "ollama" profile, enabled by COMPOSE_PROFILES=ollama in .env (the default).
+# To use an Ollama you already run on the host instead, set in .env:
+#     COMPOSE_PROFILES=
+#     MSA_OLLAMA_URL=http://host.docker.internal:11434/v1
 
 services:
   mock:
@@ -30,6 +32,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
+    profiles: ["ollama"]
     volumes:
       - ollama-models:/root/.ollama
     healthcheck:
@@ -40,6 +43,7 @@ services:
 
   ollama-pull:
     image: ollama/ollama:latest
+    profiles: ["ollama"]
     environment:
       OLLAMA_HOST: http://ollama:11434
     entrypoint: ["ollama", "pull", "${MSA_LOCAL_MODEL:-qwen2.5:3b}"]
@@ -69,7 +73,7 @@ services:
         condition: service_healthy
       ollama-pull:
         condition: service_completed_successfully
-        required: false          # not needed when a hosted key or an external Ollama is used
+        required: false          # skipped when the "ollama" profile is off (hosted key or host Ollama)
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
